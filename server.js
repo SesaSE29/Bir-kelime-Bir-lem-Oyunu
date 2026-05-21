@@ -120,7 +120,7 @@ function startTimer(code) {
       clearInterval(room.timerInterval);
       room.timerInterval = null;
       room.state = 'answering';
-      room.answers = {};
+    
       broadcastRoom(code);
     }
   }, 1000);
@@ -129,6 +129,10 @@ function startTimer(code) {
 function setupNextRound(code) {
   const room = rooms[code];
   if (!room) return;
+  if (room.timerInterval) {
+    clearInterval(room.timerInterval);
+    room.timerInterval = null;
+  }
   const type = room.rounds_plan[room.currentRound];
   if (type === 'word') {
     room.currentData = { type: 'word', letters: randomLetters() };
@@ -303,14 +307,25 @@ io.on('connection', (socket) => {
   });
 
   // CEVAP GÖNDER (oyuncu)
-  socket.on('submit_answer', (answer, cb) => {
+socket.on('submit_answer', (answer, cb) => {
     const code = socket.data.roomCode;
     const room = rooms[code];
     if (!room) return cb && cb({ ok: false });
-    if (room.state !== 'answering' && room.state !== 'playing') return cb && cb({ ok: false, error: 'Cevap zamanı değil' });
+    if (room.state !== 'answering' && room.state !== 'playing' && room.state !== 'ready') return cb && cb({ ok: false, error: 'Cevap zamanı değil' });
     const player = room.players.find(p => p.id === socket.id);
     if (!player) return cb && cb({ ok: false });
     room.answers[player.id] = answer;
+    
+    const connectedPlayers = room.players.filter(p => p.connected);
+    const allAnswered = connectedPlayers.every(p => room.answers[p.id] !== undefined);
+    if (allAnswered && room.state === 'playing') {
+      if (room.timerInterval) {
+        clearInterval(room.timerInterval);
+        room.timerInterval = null;
+      }
+      room.state = 'answering';
+    }
+    
     broadcastRoom(code);
     cb && cb({ ok: true });
   });
