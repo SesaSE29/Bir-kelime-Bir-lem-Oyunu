@@ -647,7 +647,14 @@ function renderGameRound() {
       if (!myAnswerSent) renderPlayArea();
     }
   }
-
+// Host sonuç gösterme tuşunu güncelle
+  if (roomState.state === 'answering' && isHost) {
+    const me = roomState.players.find(p => p.id === myId);
+    if (me && me.hasAnswered) {
+      // post-answer ekranı zaten render edildi, yenileyelim
+      renderPostAnswer();
+    }
+  }
   // scoreboard
   renderScoreboard($('scoreboard'));
 }
@@ -717,13 +724,23 @@ function renderPlayArea() {
 
 function renderPostAnswer() {
   const area = $('post-answer');
+  const allAnswered = roomState.players.filter(p => p.connected).every(p => p.hasAnswered);
+  const hostBtn = isHost && (roomState.state === 'answering' || allAnswered)
+    ? `<button class="btn big" onclick="hostShowResults()" style="margin-top:12px">Sonuçları Göster ▶</button>`
+    : '';
   area.innerHTML = `
     <div class="waiting-msg">
       <div class="icon">✓</div>
       <h3>Cevabını verdin</h3>
       <div style="color:var(--muted);margin-bottom:12px;">Diğer oyuncular bekleniyor...</div>
       <button class="btn ghost sm" onclick="clearMyAnswer()">Cevabımı Değiştir</button>
+      ${hostBtn}
     </div>`;
+}
+
+function hostShowResults() {
+  if (!isHost) return;
+  socket.emit('show_results');
 }
 
 function clearMyAnswer() {
